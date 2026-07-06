@@ -1,0 +1,19 @@
+{
+  "images": [
+    "cat",
+    "bellpepper",
+    "vase"
+  ],
+  "blocks": [
+    5,
+    6,
+    7
+  ],
+  "timesteps": [
+    0.05,
+    0.07,
+    0.1,
+    0.12,
+    0.15
+  ]
+}

@@ -1,0 +1,11 @@
+# scratch / large source inputs (not needed to view the page)
+static/images/candidates/
+preview.ipynb
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+static/images/attention_diff/cat_sdvae_latent.pt
+pretrained_models/
+*.pt
+*.pth
+*.safetensors

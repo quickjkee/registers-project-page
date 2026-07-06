@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Registers Matter for Pixel-Space Diffusion Transformers</title>
+
+  <meta name="description" content="Register tokens improve convergence and generation quality of pixel-space Diffusion Transformers, despite DiTs lacking the patch-token outliers that motivate registers in ViTs.">
+  <meta property="og:title" content="Registers Matter for Pixel-Space Diffusion Transformers">
+  <meta property="og:description" content="Register tokens improve convergence and generation quality of pixel-space Diffusion Transformers.">
+  <!-- Favicon / browser-tab icon -->
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="static/images/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="static/images/favicon-16.png">
+  <link rel="apple-touch-icon" href="static/images/apple-touch-icon.png">
+
+  <!-- Bulma CSS (same framework the Nerfies template uses) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="static/css/index.css">
+</head>
+
+<body>
+
+<!-- ================= Dark / light theme toggle ================= -->
+<button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+  <i class="fas fa-moon moon-icon"></i>
+  <i class="fas fa-sun sun-icon"></i>
+</button>
+
+<!-- ===================================================================== -->
+<!-- HERO: title, authors, affiliations, links                              -->
+<!-- ===================================================================== -->
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+
+          <h1 class="title is-2 publication-title">
+            Registers Matter for Pixel-Space Diffusion Transformers
+          </h1>
+
+          <!-- Authors. FILL ME: replace href="#" with each author's homepage. -->
+          <div class="is-size-5 publication-authors">
+            <span class="author-block">
+              <a href="https://scholar.google.com/citations?user=o6pRm_gAAAAJ&hl=en" target="_blank" rel="noopener">Nikita Starodubcev</a>,
+            </span>
+            <span class="author-block">
+              <a href="https://scholar.google.com/citations?user=R4hnjs4AAAAJ&hl=en" target="_blank" rel="noopener">Ilia Sudakov</a><sup>*</sup>,
+            </span>
+            <span class="author-block">
+              <a href="https://github.com/free001style" target="_blank" rel="noopener">Ilya Drobyshevskiy</a><sup>*</sup>,
+            </span>
+            <span class="author-block">
+              <a href="https://scholar.google.com/citations?hl=en&user=2Kv3JP0AAAAJ&view_op=list_works&sortby=pubdate" target="_blank" rel="noopener">Artem Babenko</a>,
+            </span>
+            <span class="author-block">
+              <a href="https://dbaranchuk.github.io/" target="_blank" rel="noopener">Dmitry Baranchuk</a>
+            </span>
+          </div>
+
+          <div class="is-size-5 publication-authors">
+            <span class="author-block">Yandex Research</span>
+          </div>
+          <div class="is-size-7 publication-authors" style="opacity:.7;">
+            <span><sup>*</sup>Equal contribution.</span>
+          </div>
+
+          <!-- Links. FILL ME: set the PDF + code/project URLs. arXiv is filled. -->
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/pdf/2605.16147" class="external-link button is-normal is-dark" target="_blank" rel="noopener">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Paper</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2605.16147" class="external-link button is-normal is-dark" target="_blank" rel="noopener">
+                  <span class="icon"><i class="ai ai-arxiv"></i></span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="#" class="external-link button is-normal is-dark" target="_blank" rel="noopener">
+                  <span class="icon"><i class="fab fa-github"></i></span>
+                  <span>Code</span>
+                </a>
+              </span>
+            </div>
+          </div>
+
+          <!-- =============================================================== -->
+          <!-- TABLE OF CONTENTS: anchor links that jump to sections below.   -->
+          <!-- Each href="#NAME" matches an id="NAME" on a section.            -->
+          <!-- All sections stay visible. This just scrolls to them.           -->
+          <!-- =============================================================== -->
+          <nav class="switcher-buttons" aria-label="Table of contents">
+            <a class="switch-btn" href="#tldr">TL;DR</a>
+            <a class="switch-btn" href="#attention">Background</a>
+            <a class="switch-btn" href="#puzzle">The puzzle</a>
+            <a class="switch-btn" href="#why">Why registers help</a>
+            <a class="switch-btn" href="#architecture">In-context tokens</a>
+            <a class="switch-btn" href="#results">Register guidance</a>
+          </nav>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<!-- CONTENT SECTIONS: all visible. The TOC links above jump to each id.   -->
+<!-- ===================================================================== -->
+
+<!-- SECTION: TL;DR -->
+<section class="section" id="tldr">
+  <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-11">
+          <div class="tldr-box">
+            <h2 class="title is-3">TL;DR</h2>
+            <div class="content has-text-justified">
+              <p>
+                Register tokens were made for ViTs to fix noisy patch tokens. Diffusion transformers
+                don't have that problem, so registers shouldn't help. But they do, and adding them
+                creates high-norm tokens inside the registers themselves. <strong>Pixel-space</strong>
+                DiTs benefit the most, while latent-space models barely change.
+              </p>
+              <p>
+                In pixel-space DiTs, registers lower patch-token norms and smooth the features, with
+                some tokens acting as norm sinks and others carrying global information. This also
+                explains recent pixel-space DiTs with in-context class tokens: their gains likely come
+                from this register-like behavior, not from extra class information.
+              </p>
+              <p>
+                Building on this, we propose <strong>Register Guidance</strong>, which uses the model's
+                prediction without registers as a negative direction (instead of the unconditional
+                prediction used in CFG) for consistent quality gains.
+              </p>
+            </div>
+            <!-- Drop a teaser figure here once ready: -->
+            <!-- <figure class="image"><img src="static/images/teaser.png" alt="Teaser"></figure> -->
+          </div>
+        </div>
+      </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<!-- SECTION: Background: outliers in ViTs (own highlighted background).    -->
+<!-- INTERACTIVE: CLS->patch attention maps, slider over depth.             -->
+<!--   Files: static/images/attention/<key>_blockNN.png (NN=01..23)         -->
+<!--   Two rows of models via data-models / data-models2 (without / with    -->
+<!--   registers); one slider drives both. Edit + regenerate to change.     -->
+<!-- ===================================================================== -->
+<section class="section attn-section" id="attention">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-left">
+      <div class="column is-11">
+        <h2 class="title is-3 has-text-centered">Background: outliers in ViTs</h2>
+        <div class="content has-text-justified" style="margin-bottom:1.5rem;">
+          <p>
+            In ViTs (e.g. DINOv2), a few patch tokens attain anomalously high norms, usually in
+            low-information regions like the background. This produces artifacts in the attention
+            maps. We visualize these outliers for different models below, across depth.
+          </p>
+          <p>
+            These outlier tokens are
+            <strong style="color:#e0394a;">colored red</strong>: they are <em>static</em> artifacts
+            pinned to the same background locations across layers. For example, in DeiT they are present
+            throughout, while in DINOv2 they emerge only at deeper blocks. Register tokens were
+            proposed to absorb this behavior, and the bottom row shows that the artifacts disappear
+            once registers are added.
+          </p>
+        </div>
+
+        <div class="attn-viewer"
+             data-num-blocks="23"
+             data-first-layer="10"
+             data-models="vit:DINOv2-L/14, deit:DeiT-III-H/14, openclip:OpenCLIP-H/14, dino:DINOv2-g/14"
+             data-models2="reg_dino_s:DINOv2-S/14, reg_dino_b:DINOv2-B/14, reg_dino_l:DINOv2-L/14, reg_dino_g:DINOv2-g/14">
+
+          <!-- Input image, on its own -->
+          <div class="attn-input-row">
+            <figure class="attn-panel attn-input">
+              <img class="attn-img" src="static/images/attention/input.png" alt="Input image">
+              <figcaption>Input</figcaption>
+            </figure>
+          </div>
+
+          <!-- Row group 1: WITHOUT registers (populated by JS from data-models) -->
+          <h4 class="attn-row-title">Without registers</h4>
+          <div class="attn-panels attn-models"></div>
+
+          <!-- Row group 2: WITH registers (populated by JS from data-models2) -->
+          <h4 class="attn-row-title">With registers</h4>
+          <div class="attn-panels attn-models2"></div>
+
+          <div class="attn-control">
+            <span class="attn-control-label">Depth step</span>
+            <input type="range" class="attn-slider" min="1" max="23" step="1" value="23"
+                   aria-label="Depth step through layers">
+            <output class="attn-value">23</output>
+          </div>
+          <p class="attn-caption">Attention is computed as <code>[CLS]&nbsp;&rarr;&nbsp;patches</code>, averaged over heads. <br>
+            The high-norm outliers are static artifacts that persist in the same background location across layers.</p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION: The puzzle -->
+<section class="section" id="puzzle">
+  <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-11">
+          <h2 class="title is-3">The puzzle: DiTs have no outliers <br> but benefit from registers</h2>
+          <div class="content has-text-justified">
+            <p>
+              We find that DiTs, in both latent and pixel space, <strong>do not exhibit these
+              high-norm patch-token outliers</strong>; their token norms are nearly uniform and their
+              attention maps stay focused on the main objects. So registers shouldn't help, but they
+              do.
+            </p>
+          </div>
+
+          <!-- ============================================================= -->
+          <!-- INTERACTIVE: diffusion-transformer attention maps.             -->
+          <!-- 2D control: a layer slider + a timestep slider. Files:         -->
+          <!--   static/images/attention_diff/<key>_L<li>_T<ti>.png           -->
+          <!--   li = 1..nlayers, ti = 1..ntimesteps. manifest_diff.json has  -->
+          <!--   per-model layer indices and the timestep values.             -->
+          <!-- ============================================================= -->
+          <div class="attn-diff-viewer"
+               data-models="jit:pDiT (JiT-H/16), sit:SiT-B/2, dit:DiT-XL/2, rae:RAE (DiT-DH)">
+
+            <div class="attn-input-row">
+              <figure class="attn-panel attn-input">
+                <img class="attn-img" src="static/images/attention_diff/input.png" alt="Input image">
+                <figcaption>Input</figcaption>
+              </figure>
+            </div>
+
+            <div class="attn-panels attn-diff-models"></div>
+
+            <div class="attn-control">
+              <span class="attn-control-label">Layer</span>
+              <input type="range" class="attn-slider attn-slider-layer" min="1" max="5" step="1" value="5"
+                     aria-label="Transformer layer (deeper to the right)">
+              <output class="attn-value attn-value-layer">5</output>
+            </div>
+            <div class="attn-control">
+              <span class="attn-control-label">Noise (t)</span>
+              <span class="attn-end-label">more&nbsp;noise</span>
+              <input type="range" class="attn-slider attn-slider-time" min="1" max="7" step="1" value="1"
+                     aria-label="Diffusion timestep t (left = more noise, right = less noise)">
+              <span class="attn-end-label">less&nbsp;noise</span>
+              <output class="attn-value attn-value-time">t=0.1 (more noise)</output>
+            </div>
+            <p class="attn-caption">We show attention over the main object only (the head most focused on it), across layers and noise levels.</p>
+          </div>
+
+          <!-- Lead-in to the token-norm figure -->
+          <div class="content has-text-justified" style="margin-top:2.5rem;">
+            <p>
+              Attention maps can be noisy and head-dependent. <strong>Token feature norms</strong>
+              tell the story more cleanly: in ViTs a few patch tokens attain anomalously high norms,
+              the <em>outliers</em> that motivate register tokens, whereas our diffusion
+              transformers keep <strong>nearly uniform</strong> token norms, with no such spikes.
+            </p>
+          </div>
+
+          <!-- ============================================================= -->
+          <!-- TOKEN-NORM FIGURE (paper Fig. 2 style). 3x2 grid:              -->
+          <!--   row 1: two ViTs (clear high-norm outlier tokens)            -->
+          <!--   rows 2-3: our four diffusion transformers (uniform norms)   -->
+          <!-- Plots generated by scripts/gen_token_norms.py.                -->
+          <!-- ============================================================= -->
+          <figure class="norms-figure">
+            <div class="norms-grid">
+              <img src="static/images/norms/vit_dino.png"   alt="DINOv2 ViT-g token norms">
+              <img src="static/images/norms/vit_dino_b.png" alt="DINOv2 ViT-B token norms">
+              <img src="static/images/norms/jit.png" alt="pDiT token norms">
+              <img src="static/images/norms/sit.png" alt="SiT token norms">
+              <img src="static/images/norms/dit.png" alt="DiT token norms">
+              <img src="static/images/norms/rae.png" alt="RAE token norms">
+            </div>
+            <figcaption class="attn-caption">
+              Per-token feature norm vs. token index. <strong>Top row:</strong> ViTs show isolated
+              high-norm outlier tokens. <strong>Bottom rows:</strong> diffusion transformers
+              (pDiT, SiT, DiT, RAE) have nearly uniform norms, with no outliers.
+            </figcaption>
+          </figure>
+
+          <!-- Lead-in to the FID table -->
+          <div class="content has-text-justified" style="margin-top:2.5rem;">
+            <p>
+              So registers seem unnecessary, yet they help. We find that register tokens show
+              the largest improvements in <strong>pixel space</strong>, provide smaller gains in
+              <strong>VAE space</strong>, and, interestingly, <strong>degrade</strong> performance in
+              <strong>RAE</strong>-based models.
+            </p>
+          </div>
+
+          <!-- ============================================================= -->
+          <!-- FID TABLE (paper Table 2). Column colors match the paper:      -->
+          <!--   RAE-space = pink, VAE-space = yellow, Pixel-space = green.    -->
+          <!--   Bold = better (lower) FID within each column/size.           -->
+          <!-- ============================================================= -->
+          <figure class="fid-table-wrap">
+            <table class="fid-table">
+              <thead>
+                <tr>
+                  <th class="rowhead"></th>
+                  <th class="col-rae">RAE-space<br><span>DiT<sup>DH</sup> backbone</span></th>
+                  <th class="col-vae">VAE-space<br><span>SiT backbone</span></th>
+                  <th class="col-pix">Pixel-space<br><span>pDiT backbone</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="group"><td colspan="4">Base size</td></tr>
+                <tr>
+                  <td class="rowhead">w/ reg.</td>
+                  <td class="col-rae">7.48</td>
+                  <td class="col-vae"><strong>9.40</strong></td>
+                  <td class="col-pix"><strong>5.30</strong></td>
+                </tr>
+                <tr>
+                  <td class="rowhead">w/o reg.</td>
+                  <td class="col-rae"><strong>6.58</strong></td>
+                  <td class="col-vae">10.40</td>
+                  <td class="col-pix">7.39</td>
+                </tr>
+                <tr class="group"><td colspan="4">Large size</td></tr>
+                <tr>
+                  <td class="rowhead">w/ reg.</td>
+                  <td class="col-rae">4.44</td>
+                  <td class="col-vae"><strong>2.38</strong></td>
+                  <td class="col-pix"><strong>2.69</strong></td>
+                </tr>
+                <tr>
+                  <td class="rowhead">w/o reg.</td>
+                  <td class="col-rae"><strong>3.91</strong></td>
+                  <td class="col-vae">2.53</td>
+                  <td class="col-pix">3.52</td>
+                </tr>
+              </tbody>
+            </table>
+            <figcaption class="attn-caption">
+              FID (&darr; lower is better) with and without register tokens. Registers help most in
+              pixel space, help less in VAE space, and hurt in RAE space. Bold marks the better
+              setting per column.
+            </figcaption>
+          </figure>
+
+        </div>
+      </div>
+  </div>
+</section>
+
+<!-- SECTION: Why registers help -->
+<section class="section" id="why">
+  <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-11">
+          <h2 class="title is-3">Registers make intermediate features cleaner</h2>
+          <div class="content has-text-justified">
+            <p>
+              We saw that pixel-space DiTs have no patch-token outliers, yet registers still help.
+              What do they change?
+            </p>
+            <p>
+              Adding register tokens makes <strong>high-norm outliers appear</strong>,
+              but they emerge <strong>within the register tokens themselves</strong>, while the
+              patch tokens stay clean. Below, pDiT-B/16 without registers has uniform token norms. With
+              registers, the first 32 (register) tokens spike, leaving the patches uniform.
+            </p>
+          </div>
+
+          <!-- ============================================================= -->
+          <!-- Two figures: pDiT-B/16 token norms without vs with registers. -->
+          <!-- Generated by scripts/gen_token_norms.py (jit_noreg, jit_reg). -->
+          <!-- ============================================================= -->
+          <figure class="norms-figure">
+            <div class="norms-grid">
+              <img src="static/images/norms/jit_noreg.png" alt="pDiT-B/16 token norms without registers">
+              <img src="static/images/norms/jit_reg.png"   alt="pDiT-B/16 token norms with registers">
+            </div>
+            <figcaption class="attn-caption">
+              Per-token feature norm vs. token index for pDiT-B/16. <strong>Left:</strong> without
+              registers, norms are uniform. <strong>Right:</strong> with registers, the register
+              tokens (shaded) become high-norm outliers while patch tokens remain uniform.
+            </figcaption>
+          </figure>
+
+          <!-- Lead-in to the PCA viewer -->
+          <div class="content has-text-justified" style="margin-top:2.5rem;">
+            <p>
+              And this matters: register tokens make the <strong>intermediate feature maps cleaner</strong>
+              at high noise. Below, PCA of the patch features for pDiT-B/16: with registers the map
+              is far less noisy than without. Drag the sliders to step through blocks and noise levels.
+            </p>
+          </div>
+
+          <!-- ============================================================= -->
+          <!-- INTERACTIVE: PCA feature maps (raw 16x16). 3 panels:           -->
+          <!--   input | without registers | with registers.                 -->
+          <!--   Files: static/images/pca/{noreg,reg}_b<NN>_t<TT>.png         -->
+          <!--   Block + noise sliders. manifest_pca.json has the axes.       -->
+          <!-- ============================================================= -->
+          <div class="pca-viewer">
+            <div class="attn-panels pca-panels">
+              <figure class="attn-panel">
+                <div class="attn-model-name">Input</div>
+                <img class="attn-img" id="pca-input" src="static/images/pca/input_cat.png" alt="Input">
+              </figure>
+              <figure class="attn-panel">
+                <div class="attn-model-name">Without registers</div>
+                <img class="attn-img" id="pca-noreg" src="static/images/pca/cat_noreg_b07_t01.png" alt="PCA without registers">
+              </figure>
+              <figure class="attn-panel">
+                <div class="attn-model-name">With registers</div>
+                <img class="attn-img" id="pca-reg" src="static/images/pca/cat_reg_b07_t01.png" alt="PCA with registers">
+              </figure>
+            </div>
+
+            <div class="attn-control">
+              <span class="attn-control-label">Image</span>
+              <input type="range" class="attn-slider pca-slider-img" min="1" max="3" step="1" value="1"
+                     aria-label="Input image">
+              <output class="attn-value pca-val-img">cat</output>
+            </div>
+            <div class="attn-control">
+              <span class="attn-control-label">Block</span>
+              <input type="range" class="attn-slider pca-slider-block" min="5" max="7" step="1" value="7"
+                     aria-label="Transformer block">
+              <output class="attn-value pca-val-block">7</output>
+            </div>
+            <div class="attn-control">
+              <span class="attn-control-label">Noise (t)</span>
+              <span class="attn-end-label">more&nbsp;noise</span>
+              <input type="range" class="attn-slider pca-slider-time" min="1" max="5" step="1" value="1"
+                     aria-label="Diffusion timestep (lower t = more noise)">
+              <span class="attn-end-label">less&nbsp;noise</span>
+              <output class="attn-value pca-val-time">t=0.05</output>
+            </div>
+          </div>
+
+        </div>
+      </div>
+  </div>
+</section>
+
+<!-- SECTION: In-context tokens -->
+<section class="section" id="architecture">
+  <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-11">
+          <h2 class="title is-3">In-context tokens play the role of registers</h2>
+          <div class="content has-text-justified">
+            <p>
+              Recent DiTs incorporate conditioning signals (e.g., text or class labels) by appending additional tokens
+              to the sequence of image patches and processing them jointly through shared transformer layers. For
+              example, JiT employs conditioning by adding duplicated class
+              embeddings to the input sequence, leading to notable improvements in generation quality. <strong>This raises
+                the question of whether such in-context tokens implicitly function as register tokens.</strong>
+            </p>
+          </div>
+
+          <div class="content has-text-justified">
+            <p>
+              Interestingly, we find that in-context tokens become outliers, as registers did.
+            </p>
+          </div>
+
+          <figure class="norms-figure">
+            <div class="norms-grid">
+              <img src="static/images/norms/jit_reg.png" alt="pDiT-B/16 token norms with registers">
+              <img src="static/images/norms/jit_incontext.png"   alt="JiT-B/16 token norms with incontext conditioning">
+            </div>
+            <figcaption class="attn-caption">
+              Per-token feature norm vs. token index for pDiT-B/16 and JiT-B/16. <strong>Left:</strong> pDiT-B/16 with
+              registers. <strong>Right:</strong> JiT-B/16 with in-context class tokens, the register and in-context
+              tokens (shaded) become high-norm outliers while patch tokens remain uniform.
+            </figcaption>
+          </figure>
+
+          <div class="content has-text-justified" style="margin-top:2.5rem;">
+            <p>
+              We dive deeper. The figure below shows classification accuracy for in-context tokens.
+               It is highly diverse: some tokens achieve high accuracy (≈ 0.9), others moderate accuracy (≈ 0.4), 
+               and some very low accuracy (≈ 0.02). These results suggest the following: (a) tokens with the highest norms act as norm sinks,
+                yielding the lowest accuracy, and (b) tokens with moderate norms encode diverse information about the image beyond class-specific features.
+
+            </p>
+          </div>
+
+          <figure class="norms-figure" style="width:min(620px,92vw);">
+            <img src="static/images/others/jit_accuracy.png" alt="Linear probing accuracy for in-context tokens"
+                 style="width:100%;border-radius:8px;background:#fff;">
+            <figcaption class="attn-caption">
+              <strong>Linear probing accuracy for in-context tokens.</strong>
+              Bar height shows classification accuracy, while color indicates token norm magnitude.
+              High-norm tokens yield low accuracy, suggesting they act as norm sinks.
+            </figcaption>
+          </figure>
+
+          <div class="content has-text-justified" style="margin-top:2.5rem;">
+            <p>
+              To confirm that <strong>in-context tokens capture broad information about the image, 
+                rather than only class-specific features as intended</strong>, 
+                we visualize attention maps for the in-context tokens below. 
+                We observe that these tokens attend to distinct semantic regions of the image. 
+                In this example, some tokens focus on background elements, such as the jungle, 
+                while others attend to object parts, such as the tiger’s head and back, or foreground objects, such as the stick.
+
+            </p>
+          </div>
+
+          <figure class="incontext-figure">
+            <div class="attn-input-row">
+              <span class="attn-panel attn-input">
+                <img class="attn-img" src="static/images/attention_regs/input.png" alt="Input image">
+                <span class="attn-input-cap">Input</span>
+              </span>
+            </div>
+
+            <div class="image-row">
+              <div class="image-card">
+                <div class="image-caption">In-context token 1</div>
+                <img class="attn-img" src="static/images/attention_regs/r01_t04_B11_overlay.png" alt="In-context token 1 attention map">
+              </div>
+
+              <div class="image-card">
+                <div class="image-caption">In-context token 7</div>
+                <img class="attn-img" src="static/images/attention_regs/r07_t05_B11_overlay.png" alt="In-context token 7 attention map">
+              </div>
+
+              <div class="image-card">
+                <div class="image-caption">In-context token 15</div>
+                <img class="attn-img" src="static/images/attention_regs/r15_t04_B10_overlay.png" alt="In-context token 15 attention map">
+              </div>
+
+              <div class="image-card">
+                <div class="image-caption">In-context token 26</div>
+                <img class="attn-img" src="static/images/attention_regs/r26_t01_B05_overlay.png" alt="In-context token 26 attention map">
+              </div>
+            </div>
+
+            <figcaption class="attn-caption">
+              Attention maps for selected in-context tokens.
+              Different in-context tokens attend to different semantic regions, including the background, object parts, and foreground elements.
+            </figcaption>
+          </figure>
+
+        </div>
+      </div>
+  </div>
+</section>
+
+<!-- SECTION: Register guidance -->
+<section class="section" id="results">
+  <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-11">
+          <h2 class="title is-3">Register guidance</h2>
+          <div class="content has-text-justified">
+            <p>
+              Registers help the model: they give it an extra internal signal that boosts generation
+              quality, rather than simply acting as additional class information. Our idea is simple:
+              let's amplify this signal.
+            </p>
+            <p>
+              We propose <strong>Register Guidance</strong>, a guidance method that uses the model's
+              prediction <em>without</em> registers as a negative direction, instead of relying on an
+              unconditional prediction as in classifier-free guidance (CFG). Pushing away from the
+              register-free prediction strengthens exactly the signal the registers contribute, and it
+              combines naturally with CFG.
+            </p>
+          </div>
+
+          <!-- Register guidance algorithm: training + inference pseudocode -->
+          <figure class="algo-figure">
+            <img src="static/images/algo.png"
+                 alt="Pseudocode for register guidance: training with register dropout, RG at inference, and combined RG + CFG at inference">
+            <figcaption class="attn-caption">
+              During training we randomly drop the registers (probability&nbsp;<em>p</em>) so the model
+              learns both register and register-free predictions. At inference, register guidance (RG)
+              amplifies the difference between the two, and combines naturally with classifier-free
+              guidance (CFG).
+            </figcaption>
+          </figure>
+
+          <div class="content has-text-justified" style="margin-top:2rem;">
+            <p>
+              Below we present a generation example of CFG&nbsp;+&nbsp;RG. Use the sliders to vary the
+              subject, the CFG scale, and the RG scale: CFG sharpens the class identity, while RG
+              improves visual details and object structure.
+            </p>
+          </div>
+
+          <!-- ============================================================= -->
+          <!-- INTERACTIVE: register guidance switcher.                       -->
+          <!--   Pick subject, CFG (class) scale, RG (register) scale.        -->
+          <!--   shows the matching generated sample.                         -->
+          <!--   Files: static/images/reg_guidance/<slug>_cfg<c>_rg<r>.png    -->
+          <!-- ============================================================= -->
+          <div class="rg-viewer"
+               data-images="macaw:Macaw,cab:Taxi,sportscar:Sports car,lion:Lion"
+               data-cfgs="1.0,1.5,2.0,2.5"
+               data-rgs="0.0,1.0,2.0,2.5">
+            <figure class="rg-figure">
+              <img class="rg-img" src="static/images/reg_guidance/macaw_cfg1.0_rg0.0.png"
+                   alt="Generated sample for the selected subject, CFG and RG scales">
+            </figure>
+
+            <div class="attn-control">
+              <span class="attn-control-label">Image</span>
+              <input type="range" class="attn-slider rg-slider-img" min="1" max="4" step="1" value="1"
+                     aria-label="Subject">
+              <output class="attn-value rg-val-img">Macaw</output>
+            </div>
+            <div class="attn-control">
+              <span class="attn-control-label">CFG</span>
+              <input type="range" class="attn-slider rg-slider-cfg" min="1" max="4" step="1" value="1"
+                     aria-label="Classifier-free guidance scale">
+              <output class="attn-value rg-val-cfg">1.0</output>
+            </div>
+            <div class="attn-control">
+              <span class="attn-control-label">RG</span>
+              <input type="range" class="attn-slider rg-slider-rg" min="1" max="4" step="1" value="1"
+                     aria-label="Register guidance scale">
+              <output class="attn-value rg-val-rg">0.0</output>
+            </div>
+            <p class="attn-caption">JiT-L/16. CFG sharpens class identity, RG strengthens the register signal.</p>
+          </div>
+
+          <figure class="algo-figure" style="margin-top:2rem;">
+            <img src="static/images/results.png" alt="Register guidance results">
+          </figure>
+
+        </div>
+      </div>
+  </div>
+</section>
+
+
+<!-- ===================================================================== -->
+<!-- BibTeX                                                                 -->
+<!-- ===================================================================== -->
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title">BibTeX</h2>
+    <pre><code>@article{starodubcev2026registers,
+  title   = {Registers Matter for Pixel-Space Diffusion Transformers},
+  author  = {Starodubcev, Nikita and Sudakov, Ilia and Drobyshevskiy, Ilya
+             and Babenko, Artem and Baranchuk, Dmitry},
+  journal = {arXiv preprint arXiv:2605.16147},
+  year    = {2026}
+}</code></pre>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<!-- Footer                                                                 -->
+<!-- ===================================================================== -->
+<footer class="footer">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-8 has-text-centered content">
+        <p>
+          This website is licensed under a
+          <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
+          Template adapted from the
+          <a href="https://github.com/nerfies/nerfies.github.io">Nerfies</a> project page.
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="static/js/index.js"></script>
+</body>
+</html>
