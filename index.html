@@ -129,10 +129,11 @@
             <h2 class="title is-3">TL;DR</h2>
             <div class="content has-text-justified">
               <p>
-                Register tokens were made for ViTs to fix noisy patch tokens. Diffusion transformers
-                don't have that problem, so registers shouldn't help. But they do, and adding them
+                Register tokens were introduced for ViTs to address outliers in patch tokens. 
+                We notice that diffusion transformers don't have such outliers, 
+                suggesting that registers may not be needed there. But they do, and adding them
                 creates high-norm tokens inside the registers themselves. <strong>Pixel-space</strong>
-                DiTs benefit the most, while latent-space models barely change.
+                DiTs benefit the most, while latent-space models barely change their performance.
               </p>
               <p>
                 In pixel-space DiTs, registers lower patch-token norms and smooth the features, with
